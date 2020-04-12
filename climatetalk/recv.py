@@ -4,6 +4,7 @@
 import threading
 import logging
 from . import timers
+from .packet import Packet
 
 logger = logging.getLogger(__name__)
 
@@ -19,23 +20,6 @@ CT_ISUM2 = 0x00
 BROADCAST_SUBNET = 0x00
 
 
-class MACAddress(bytearray):
-
-    @property
-    def manufacturer_id(self):
-        return self[1] << 8 | self[2]
-
-    @property
-    def id(self):
-        return (
-            self[3] << 32 |
-            self[4] << 24 |
-            self[5] << 16 |
-            self[6] << 8 |
-            self[7]
-        )
-
-
 class RS485Com(object):
 
     def __init__(self, serial):
@@ -43,7 +27,7 @@ class RS485Com(object):
         self._thread = None
         self._event = threading.Event()
         self._lock = threading.Lock()
-        self.packet = Packet()
+        self.packet = bytearray()
         self.inter_char_timer = timers.BusyTimer(
             timers.TimerUS(),
             INTERCHAR_DELAY_THRESHOLD,
@@ -51,6 +35,15 @@ class RS485Com(object):
         )
         self._recv_queue = []
         self._queue_event = threading.Event()
+        self._send_lock = threading.Lock()
+
+    def write(self, packet):
+        packet.calc_checksum()
+        with self._send_lock:
+            packet_timer = timers.TimerUS()
+            self.serial.write(packet)
+            while packet_timer.elapsed() < INTERPACKET_DELAY_THRESHOLD:
+                pass
 
     def start(self):
         if self._thread is None:
@@ -60,7 +53,7 @@ class RS485Com(object):
 
     def _queue_packet(self):
         packet = self.packet
-        self.packet = Packet()
+        self.packet = bytearray()
 
         self._recv_queue.append(packet)
         self._queue_event.set()
@@ -69,7 +62,7 @@ class RS485Com(object):
         while not self._event.is_set():
             self._queue_event.wait()
             while self._recv_queue:
-                yield self._recv_queue.pop(0)
+                yield Packet(self._recv_queue.pop(0))
             self._queue_event.clear()
 
     def _run(self):
@@ -88,7 +81,7 @@ class RS485Com(object):
                     self.inter_char_timer.start()
 
                 if packet_timer.elapsed() >= INTERPACKET_DELAY_THRESHOLD:
-                    self.packet = Packet(char)
+                    self.packet = bytearray(char)
                     self.inter_char_timer.start()
                     packet_timer.reset()
 
