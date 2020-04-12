@@ -59,11 +59,29 @@ class PacketMeta(type):
         namespace = dict(
             _packet_number=data[8],
             _payload_length=data[9],
-            _payload_data=data[10:-2]
+            _payload_data=data[11:-2]
         )
         cl = type('DynamicPacket', (cl,), namespace)
         instance = cl(*args, **kwargs)
         return instance
+
+
+# Packet breakdown
+
+# byte num
+# Destination Address byte 0
+# Source Address      byte 1
+# Subnet              byte 2
+# Send Method         byte 3
+# Send Parameter 1    byte 4
+# Send Parameter 2    byte 5
+# Source Node Type    byte 6
+# Message Type        byte 7
+# Packet Number       byte 8
+# Packet Length       byte 9
+# Packet Payload      bytes 10-250
+# Message Checksum 1  byte -2
+# Message Checksum 2  byte -1
 
 
 @six.add_metaclass(PacketMeta)
@@ -233,36 +251,129 @@ class Packet(bytearray):
         return check1 == data1 and check2 == data2
 
 
-class GetConfiguration(Packet):
+class GetConfigurationRequest(Packet):
     _message_type = GET_CONFIGURATION
-    _payload_length = 0x01
-    _payload_data = bytearray(b'\x00')
+    _payload_length = 0
+    _payload_data = bytearray()
 
 
 class GetConfigurationResponse(Packet):
     _message_type = GET_CONFIGURATION_RESPONSE
 
+    @property
+    def payload_data(self):
+        return self[11:-2]
 
-class GetStatus(Packet):
+    @payload_data.setter
+    def payload_data(self, value):
+
+        while len(self) < 10 + len(value):
+            self.append(0x00)
+
+        for i, item in enumerate(value):
+            self[10 + i] = item
+
+
+class GetStatusRequest(Packet):
     _message_type = GET_STATUS
-    _payload_length = 0x01
-    _payload_data = bytearray(b'\x00')
+    _payload_length = 0
+    _payload_data = bytearray()
 
 
 class GetStatusResponse(Packet):
     _message_type = GET_STATUS_RESPONSE
 
+    @property
+    def payload_data(self):
+        return self[11:-2]
 
-class SetControlCommand(Packet):
+    @payload_data.setter
+    def payload_data(self, value):
+
+        while len(self) < 10 + len(value):
+            self.append(0x00)
+
+        for i, item in enumerate(value):
+            self[10 + i] = item
+
+
+class SetControlCommandRequest(Packet):
     _message_type = SET_CONTROL_COMMAND
 
+    @property
+    def payload_command_code(self):
+        return self[10] << 8 | self[11]
 
-class SetControlCommandResponse(Packet):
+    @payload_command_code.setter
+    def payload_command_code(self, value):
+        while len(self) < 12:
+            self.append(0x00)
+
+        self[10] = value >> 8 & 0xFF
+        self[11] = value & 0xFF
+
+    @property
+    def payload_command_data(self):
+        if len(self) == 17:
+            return self[12] << 8 | self[13]
+        else:
+            return self[12]
+
+    @payload_command_data.setter
+    def payload_command_data(self, value):
+
+        while len(self) < 12 + len(value):
+            self.append(0x00)
+
+        if len(value) == 2:
+            self[12] = value >> 8 & 0xFF
+            self[13] = value & 0xFF
+        else:
+            self[12] = value
+
+
+class SetControlCommandResponse(SetControlCommandRequest):
     _message_type = SET_CONTROL_COMMAND_RESPONSE
 
 
-class SetDisplayMessage(Packet):
+class SetDisplayMessageRequest(Packet):
     _message_type = SET_DISPLAY_MESSAGE
+
+    @property
+    def payload_node_type(self):
+        return self[10]
+
+    @payload_node_type.setter
+    def payload_node_type(self, value):
+        while len(self) < 11:
+            self.append(0x00)
+        self[10] = value
+
+    @property
+    def payload_message_length(self):
+        # 0-30
+        return self[11]
+
+    @payload_message_length.setter
+    def payload_message_length(self, value):
+        while len(self) < 12:
+            self.append(0x00)
+
+        self[11] = value
+
+    @property
+    def payload_message(self):
+        return self[14:-2]
+
+    @payload_message.setter
+    def payload_message(self, value):
+        while len(self) < len(value) + 12:
+            self.append(0x00)
+
+        for i, item in enumerate(value):
+            self[12 + i] = item
+
+        self.payload_message_length = len(value)
 
 
 class SetDisplayMessageResponse(Packet):
@@ -270,9 +381,74 @@ class SetDisplayMessageResponse(Packet):
     _payload_length = 2
     _payload_data = bytearray(b'\xAC\x06')
 
+    @property
+    def result(self):
+        return self[12]
 
-class SetDisgnostics(Packet):
+    @result.setter
+    def result(self, value):
+        # ACK or NAK
+        self[12] = value
+
+
+class SetDisgnosticsRequest(Packet):
     _message_type = SET_DISGNOSTICS
+
+    @property
+    def payload_node_type(self):
+        return self[10]
+
+    @payload_node_type.setter
+    def payload_node_type(self, value):
+        while len(self) < 11:
+            self.append(0x00)
+        self[10] = value
+
+    @property
+    def payload_major_code(self):
+        return self[11]
+
+    @payload_major_code.setter
+    def payload_major_code(self, value):
+        while len(self) < 12:
+            self.append(0x00)
+        self[11] = value
+
+    @property
+    def payload_minor_code(self):
+        return self[12]
+
+    @payload_minor_code.setter
+    def payload_minor_code(self, value):
+        while len(self) < 13:
+            self.append(0x00)
+        self[12] = value
+
+    @property
+    def payload_message_length(self):
+        # 0-15
+        return self[13]
+
+    @payload_message_length.setter
+    def payload_message_length(self, value):
+        while len(self) < 14:
+            self.append(0x00)
+
+        self[13] = value
+
+    @property
+    def payload_fault_message(self):
+        return self[14:-2]
+
+    @payload_fault_message.setter
+    def payload_fault_message(self, value):
+        while len(self) < len(value) + 14:
+            self.append(0x00)
+
+        for i, item in enumerate(value):
+            self[14 + i] = item
+
+        self.payload_message_length = len(value)
 
 
 class SetDisgnosticsResponse(Packet):
@@ -280,15 +456,49 @@ class SetDisgnosticsResponse(Packet):
     _payload_length = 2
     _payload_data = bytearray(b'\xAC\x06')
 
+    @property
+    def result(self):
+        return self[12]
 
-class GetDiagnostics(Packet):
+    @result.setter
+    def result(self, value):
+        # ACK or NAK
+        self[12] = value
+
+
+class GetDiagnosticsRequest(Packet):
     _message_type = GET_DIAGNOSTICS
     _payload_length = 2
     _payload_data = bytearray(b'\x00\x00')
 
+    @property
+    def payload_fault_type(self):
+        return self[10]
+
+    @payload_fault_type.setter
+    def payload_fault_type(self, value):
+        self[10] = value
+
+    @property
+    def payload_fault_index(self):
+        return self[11]
+
+    @payload_fault_index.setter
+    def payload_fault_index(self, value):
+        self[11] = value
+
 
 class GetDiagnosticsResponse(Packet):
     _message_type = GET_DIAGNOSTICS_RESPONSE
+
+    def __iter__(self):
+        fault = bytearray()
+        for char in self[11:-2]:
+            if char == 0x00:
+                yield fault
+                fault = bytearray()
+            else:
+                fault.append(char)
 
 
 class GetSensorDataRequest(Packet):
@@ -329,7 +539,7 @@ class SetIdentificationDataRequest(Packet):
             self[10 + i] = item
 
 
-class SetIdentificationResponse(Packet):
+class SetIdentificationDataResponse(Packet):
     _message_type = SET_IDENTIFICATION_RESPONSE
     _payload_length = 2
     _payload_data = bytearray(b'\xAC\x06')
@@ -342,8 +552,6 @@ class SetIdentificationResponse(Packet):
     @payload_result.setter
     def payload_result(self, value):
         self[11] = value
-
-
 
 
 class GetIdentificationDataRequest(Packet):
@@ -1017,11 +1225,11 @@ class GetSharedDataFromApplicationResponse(Packet):
         self.payload_shared_data_len = len(value) + 6
 
 
-class EchoRequest(Packet):
+class SetEchoRequest(Packet):
     _message_type = SET_ECHO_DATA
 
 
-class EchoResponse(Packet):
+class SetEchoResponse(Packet):
     _message_type = SET_ECHO_DATA_RESPONSE
 
 
@@ -1095,7 +1303,7 @@ class NetworkStateResponse(Packet):
         self[index + 11] = value
 
 
-class AddressConfirmationPushRequest(Packet):
+class AddressConfirmationRequest(Packet):
     _message_type = ADDRESS_CONFIRMATION
 
     @property
@@ -1118,7 +1326,7 @@ class AddressConfirmationPushRequest(Packet):
         self[index + 11] = value
 
 
-class AddressConfirmationPushResponse(Packet):
+class AddressConfirmationResponse(Packet):
     _message_type = ADDRESS_CONFIRMATION_RESPONSE
 
     @property
@@ -1281,7 +1489,7 @@ class NodeDiscoveryResponse(Packet):
             self[i + 20] = item
 
 
-class SetAddress(Packet):
+class SetAddressRequest(Packet):
     # AutoNet
     _message_type = SET_ADDRESS
     _payload_length = 19
@@ -1324,28 +1532,12 @@ class SetAddress(Packet):
             self[i + 20] = item
 
 
-# Packet breakdown
-
-# byte num
-# Destination Address byte 0
-# Source Address      byte 1
-# Subnet              byte 2
-# Send Method         byte 3
-# Send Parameter 1    byte 4
-# Send Parameter 2    byte 5
-# Source Node Type    byte 6
-# Message Type        byte 7
-# Packet Number       byte 8
-# Packet Length       byte 9
-# Packet Payload      bytes 10-250
-# Message Checksum 1  byte -2
-# Message Checksum 2  byte -1
-class SetAddressResponse(SetAddress):
+class SetAddressResponse(SetAddressRequest):
     # AutoNet
     _message_type = SET_ADDRESS_RESPONSE
 
 
-class GetNodeId(Packet):
+class GetNodeIdRequest(Packet):
     _message_type = GET_NODE_ID
     _payload_length = 1
     _payload_data = bytearray(b'\x00')
@@ -1389,7 +1581,7 @@ class NetworkSharedDataSectorImageReadWriteRequest(Packet):
     _message_type = NETWORK_SHARED_DATA_SECTOR_IMAGE_READ_WRITE_REQUEST
 
 
-class NetworkSharedDataSectorImageReadWriteRequestResponse(Packet):
+class NetworkSharedDataSectorImageReadWriteResponse(Packet):
     _message_type = NETWORK_SHARED_DATA_SECTOR_IMAGE_READ_WRITE_REQUEST_RESPONSE
 
 
@@ -1397,72 +1589,72 @@ class NetworkEncapsulationRequest(Packet):
     _message_type = NETWORK_ENCAPSULATION_REQUEST
 
 
-class NetworkEncapsulationRequestResponse(Packet):
+class NetworkEncapsulationResponse(Packet):
     _message_type = NETWORK_ENCAPSULATION_REQUEST_RESPONSE
 
 
 PACKET_CLASSES = (
-    GetConfiguration,
+    GetConfigurationRequest,
     GetConfigurationResponse,
-    GetStatus,
+    GetStatusRequest,
     GetStatusResponse,
-    SetControlCommand,
+    SetControlCommandRequest,
     SetControlCommandResponse,
-    SetDisplayMessage,
+    SetDisplayMessageRequest,
     SetDisplayMessageResponse,
-    SetDisgnostics,
+    SetDisgnosticsRequest,
     SetDisgnosticsResponse,
-    GetDiagnostics,
+    GetDiagnosticsRequest,
     GetDiagnosticsResponse,
-    GetSensorData,
+    GetSensorDataRequest,
     GetSensorDataResponse,
-    SetIdentification,
-    SetIdentificationResponse,
-    GetIdentification,
-    GetIdentificationResponse,
-    SetApplicationSharedDataToNetwork,
+    SetIdentificationDataRequest,
+    SetIdentificationDataResponse,
+    GetIdentificationDataRequest,
+    GetIdentificationDataResponse,
+    SetApplicationSharedDataToNetworkRequest,
     SetApplicationSharedDataToNetworkResponse,
-    GetApplicationSharedDataToNetwork,
+    GetApplicationSharedDataToNetworkRequest,
     GetApplicationSharedDataToNetworkResponse,
-    SetManufacturerDeviceData,
+    SetManufacturerDeviceDataRequest,
     SetManufacturerDeviceDataResponse,
-    GetManufacturerDeviceData,
+    GetManufacturerDeviceDataRequest,
     GetManufacturerDeviceDataResponse,
-    SetNetworkNodeList,
+    SetNetworkNodeListRequest,
     SetNetworkNodeListResponse,
-    DirectMemoryAccessRead,
+    DirectMemoryAccessReadRequest,
     DirectMemoryAccessReadResponse,
-    SetManufacturerGenericData,
+    SetManufacturerGenericDataRequest,
     SetManufacturerGenericDataResponse,
-    GetManufacturerGenericData,
+    GetManufacturerGenericDataRequest,
     GetManufacturerGenericDataResponse,
-    GetUserMenu,
+    GetUserMenuRequest,
     GetUserMenuResponse,
-    SetUserMenu,
+    SetUserMenuRequest,
     SetUserMenuResponse,
-    SetFactorySharedDataToApplication,
+    SetFactorySharedDataToApplicationRequest,
     SetFactorySharedDataToApplicationResponse,
-    GetSharedDataFromApplication,
+    GetSharedDataFromApplicationRequest,
     GetSharedDataFromApplicationResponse,
-    SetEchoData,
-    SetEchoDataResponse,
-    RequestToReceive,
+    SetEchoRequest,
+    SetEchoResponse,
+    RequestToReceiveRequest,
     RequestToReceiveResponse,
     NetworkStateRequest,
-    NetworkStateRequestResponse,
-    AddressConfirmation,
+    NetworkStateResponse,
+    AddressConfirmationRequest,
     AddressConfirmationResponse,
     TokenOffer,
     TokenOfferResponse,
     VersionAnnouncement,
-    NodeDiscovery,
+    NodeDiscoveryRequest,
     NodeDiscoveryResponse,
-    SetAddress,
+    SetAddressRequest,
     SetAddressResponse,
-    GetNodeId,
+    GetNodeIdRequest,
     GetNodeIdResponse,
     NetworkSharedDataSectorImageReadWriteRequest,
-    NetworkSharedDataSectorImageReadWriteRequestResponse,
+    NetworkSharedDataSectorImageReadWriteResponse,
     NetworkEncapsulationRequest,
-    NetworkEncapsulationRequestResponse
+    NetworkEncapsulationResponse
 )
