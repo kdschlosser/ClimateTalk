@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 # Copyright 2020 Kevin Schlosser
+
 import six
 from .message_types import *
 from . import mac_address
 from . import session_id
+from .utils import get_bit as _get_bit, set_bit as _set_bit
+
 
 CT_ISUM1 = 0xAA  # New Fletcher Seed.
 CT_ISUM2 = 0x00
@@ -15,19 +18,6 @@ SEND_METHOD_NON_ROUTED = 0x00
 SEND_METHOD_ROUTED_PRIORITY_CONTROL_COMMAND = 0x01
 SEND_METHOD_ROUTED_PRIORITY_NODE_TYPE = 0x02
 SEND_METHOD_ROUTED_SOCKET = 0x03
-
-
-def _set_bit(value, bit, flag):
-    if flag:
-        value |= (1 << bit)
-    else:
-        value &= ~(1 << bit)
-
-    return value
-
-
-def _get_bit(value, bit):
-    return value & (1 << bit) != 0
 
 
 class PacketNumber(int):
@@ -261,17 +251,39 @@ class GetConfigurationResponse(Packet):
     _message_type = GET_CONFIGURATION_RESPONSE
 
     @property
+    def db_id_tag(self):
+        return self[10]
+
+    @db_id_tag.setter
+    def db_id_tag(self, value):
+        while len(self) < 11:
+            self.append(0x00)
+
+        self[10] = value
+
+    @property
+    def db_length(self):
+        return self[11]
+
+    @db_length.setter
+    def db_length(self, value):
+        while len(self) < 12:
+            self.append(0x00)
+
+        self[11] = value
+
+    @property
     def payload_data(self):
-        return self[11:-2]
+        return self[12:-2]
 
     @payload_data.setter
     def payload_data(self, value):
 
-        while len(self) < 10 + len(value):
+        while len(self) < 11 + len(value):
             self.append(0x00)
 
         for i, item in enumerate(value):
-            self[10 + i] = item
+            self[12 + i] = item
 
 
 class GetStatusRequest(Packet):
