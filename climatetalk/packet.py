@@ -314,15 +314,15 @@ class SetControlCommandRequest(Packet):
 
     @property
     def payload_command_code(self):
-        return self[10] << 8 | self[11]
+        return self[10] | self[11] << 8
 
     @payload_command_code.setter
     def payload_command_code(self, value):
         while len(self) < 12:
             self.append(0x00)
 
-        self[10] = value >> 8 & 0xFF
-        self[11] = value & 0xFF
+        self[10] = value & 0xFF
+        self[11] = value >> 8 & 0xFF
 
     @property
     def payload_command_data(self):
@@ -878,6 +878,10 @@ class DirectMemoryAccessReadResponse(Packet):
             self[i + 10] = item
 
 
+class DirectMemoryAccessReadResponseMotor(DirectMemoryAccessReadResponse):
+    _message_type = DIRECT_MEMORY_ACCESS_READ_RESPONSE_MOTOR
+
+
 class SetManufacturerGenericDataRequest(Packet):
     _message_type = SET_MANUFACTURER_GENERIC_DATA
 
@@ -940,6 +944,10 @@ class GetManufacturerGenericDataRequest(Packet):
 
 class GetManufacturerGenericDataResponse(GetManufacturerGenericDataRequest):
     _message_type = GET_MANUFACTURER_GENERIC_DATA_RESPONSE
+
+
+class GetManufacturerGenericDataResponseMotor(GetManufacturerGenericDataRequest):
+    _message_type = GET_MANUFACTURER_GENERIC_DATA_RESPONSE_MOTOR
 
 
 class GetUserMenuRequest(Packet):
@@ -1636,10 +1644,12 @@ PACKET_CLASSES = (
     SetNetworkNodeListResponse,
     DirectMemoryAccessReadRequest,
     DirectMemoryAccessReadResponse,
+    DirectMemoryAccessReadResponseMotor,
     SetManufacturerGenericDataRequest,
     SetManufacturerGenericDataResponse,
     GetManufacturerGenericDataRequest,
     GetManufacturerGenericDataResponse,
+    GetManufacturerGenericDataResponseMotor,
     GetUserMenuRequest,
     GetUserMenuResponse,
     SetUserMenuRequest,
