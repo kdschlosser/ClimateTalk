@@ -169,6 +169,8 @@ class GetIdentificationMDI(bytearray):
 
 
 class SetIdentificationDataMDI(bytearray):
+    id = None
+
     def _set_string(self, null_count, value):
         offset = 9
 
@@ -298,5 +300,3 @@ class SetIdentificationDataMDI(bytearray):
     @model_revision.setter
     def model_revision(self, value):
         self._set_string(6, value)
-
-
