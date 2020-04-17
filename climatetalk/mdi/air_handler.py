@@ -24,6 +24,10 @@ AIR_HANDLER_CIRCULATOR_BLOWER_SIZE_THREE_QUARTER_HP = 0x09  # 1/3 HP
 AIR_HANDLER_CIRCULATOR_BLOWER_SIZE_ONE_HP = 0x0C  # 1/3 HP
 AIR_HANDLER_CIRCULATOR_BLOWER_SIZE_TWO_HP = 0x18  # 1/3 HP
 
+AIR_HANDLER_FAN_STATUS_AUTO = 0x00
+AIR_HANDLER_FAN_STATUS_ALWAYS_ON = 0x01
+AIR_HANDLER_FAN_STATUS_OCCUPIED_ON = 0x02
+
 
 class AirHandlerConfig0MDI(bytearray):
 
@@ -128,3 +132,114 @@ class AirHandlerConfig1MDI(bytearray):
             return self[5] - 100
 
         return 0
+
+
+class AirHandlerStatus0MDI(bytearray):
+    id = 0
+
+    @property
+    def critical_fault(self):
+
+        return self[0]
+
+    @property
+    def minor_fault(self):
+        return self[1]
+
+    @property
+    def heat_request_demand(self):
+        """
+        :return:
+        """
+        return self[2] * 0.5
+
+    @property
+    def fan_request_mode(self):
+        """
+        :return: one of AIR_HANDLER_FAN_STATUS_* constants
+        """
+        return self[3]
+
+    @property
+    def fan_request_demand(self):
+        """
+        :return:
+        """
+        return self[4] * 0.5
+
+    @property
+    def fan_request_rate(self):
+        """
+        :return:
+        """
+        return self[5]
+
+    @property
+    def fan_request_delay(self):
+        """
+        :return:
+        """
+        return self[6]
+
+    @property
+    def defrost_request_demand(self):
+        """
+        :return:
+        """
+        return self[7] * 0.5
+
+    @property
+    def emergency_request_demand(self):
+        """
+        :return:
+        """
+        return self[8] * 0.5
+
+    @property
+    def aux_request_demand(self):
+        """
+        :return:
+        """
+        return self[9] * 0.5
+
+    @property
+    def humidification_request_demand(self):
+        """
+        :return:
+        """
+        return self[10] * 0.5
+
+    @property
+    def dehumidification_request_demand(self):
+        """
+        :return:
+        """
+        return self[11] * 0.5
+
+    @property
+    def air_flow(self):
+        return self[12] << 8 | self[13]
+
+    @property
+    def current_heat_demand(self):
+        return self[14] * 0.5
+
+    @property
+    def current_fan_demand(self):
+        return self[15] * 0.5
+
+    @property
+    def current_fan_demand_rate(self):
+        return self[16]
+
+    @property
+    def current_fan_delay_remaining(self):
+        return self[17]
+
+    @property
+    def current_humidification_demand(self):
+        return self[18] * 0.5
+
+    @property
+    def current_dehumidification_demand(self):
+        return self[19] * 0.5

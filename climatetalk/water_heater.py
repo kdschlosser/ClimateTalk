@@ -7,8 +7,7 @@ import datetime
 from .packet import (
     GetConfigurationRequest,
     GetConfigurationResponse,
-    SetConfigurationRequest,
-
+)
 from .utils import get_bit as _get_bit, set_bit as _set_bit
 
 

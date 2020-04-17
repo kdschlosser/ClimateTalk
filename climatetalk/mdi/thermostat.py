@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # Copyright 2020 Kevin Schlosser
 
+
+import datetime
+
 from ..utils import (
     get_bit as _get_bit,
     set_bit as _set_bit
@@ -54,6 +57,25 @@ THERMOSTAT_INTERVAL_TYPE_4_STEP = 0x02
 THERMOSTAT_KEYPAD_LOCKOUT_OFF = 0x00
 THERMOSTAT_KEYPAD_LOCKOUT_PARTIAL = 0x01
 THERMOSTAT_KEYPAD_LOCKOUT_FULL = 0x02
+
+
+THERMOSTAT_SYSTEM_STATUS_OFF = 0x00
+THERMOSTAT_SYSTEM_STATUS_COOL = 0x01
+THERMOSTAT_SYSTEM_STATUS_AUTO_COOL = 0x02
+THERMOSTAT_SYSTEM_STATUS_HEAT = 0x03
+THERMOSTAT_SYSTEM_STATUS_AUTO_HEAT = 0x04
+THERMOSTAT_SYSTEM_STATUS_BACKUP = 0x05
+
+
+THERMOSTAT_CURTAILMENT_STATUS_NONE = 0x00
+THERMOSTAT_CURTAILMENT_STATUS_DLC = 0x01
+THERMOSTAT_CURTAILMENT_STATUS_TIERED = 0x02
+THERMOSTAT_CURTAILMENT_STATUS_RTP_PROTECTION = 0x03
+THERMOSTAT_CURTAILMENT_STATUS_RTP = 0x04
+
+THERMOSTAT_FAN_STATUS_AUTO = 0x00
+THERMOSTAT_FAN_STATUS_ALWAYS_ON = 0x01
+THERMOSTAT_FAN_STATUS_OCCUPIED_ON = 0x02
 
 
 class ThermostatMDI(bytearray):
@@ -440,3 +462,190 @@ class ThermostatMDI(bytearray):
             res += [THERMOSTAT_INTERVAL_TYPE_4_STEP]
 
         return res
+
+
+class ThermostatStatus0MDI(bytearray):
+    id = 0
+
+    @property
+    def critical_fault(self):
+
+        return self[0]
+
+    @property
+    def minor_fault(self):
+        return self[1]
+
+    @property
+    def operating_status(self):
+        """
+        :return: one of THERMOSTAT_SYSTEM_STATUS_
+        """
+        return self[2]
+
+    @property
+    def curtailment_status(self):
+        """
+        :return: one of THERMOSTAT_CURTAILMENT_STATUS_* constants
+        """
+        return self[3]
+
+    @property
+    def humidification_setpoint(self):
+        return self[4]
+
+    @property
+    def dehumidification_setpoint(self):
+        return self[5]
+
+    @property
+    def working_setpoint(self):
+        return self[6]
+
+    @property
+    def display_temp(self):
+        value = self[7] << 8 | self[8]
+
+        temp = value << 4 & 0xF
+        frac = value & 0xF
+
+        frac /= float(10)
+        return temp + frac
+
+    @property
+    def heat_setpoint(self):
+        return self[9]
+
+    @property
+    def cool_setpoint(self):
+        return self[10]
+
+    @property
+    def date_time(self):
+
+        weekday = self[11]
+        year = self[25]
+        month = self[26]
+        day = self[27]
+        hour = self[12]
+        minute = self[13]
+        second = self[14]
+
+        if 0xFF in (weekday, year, month, day, hour, minute, second):
+            return
+
+        dt = datetime.datetime.now()
+
+        return datetime.datetime(
+            month=month,
+            day=day,
+            year=year,
+            hour=hour,
+            minute=minute,
+            second=second
+        )
+
+    @property
+    def programmable_hold(self):
+        """
+        :return: THERMOSTAT_ENBLED or THERMOSTAT_DISABLED
+        """
+        return int(_get_bit(self[15], 3))
+
+    @property
+    def startup_hold(self):
+        """
+        :return: THERMOSTAT_ENBLED or THERMOSTAT_DISABLED
+        """
+        return int(_get_bit(self[15], 2))
+
+    @property
+    def temporary_hold(self):
+        """
+        :return: THERMOSTAT_ENBLED or THERMOSTAT_DISABLED
+        """
+        return int(_get_bit(self[15], 1))
+
+    @property
+    def permanent_hold(self):
+        """
+        :return: THERMOSTAT_ENBLED or THERMOSTAT_DISABLED
+        """
+        return int(_get_bit(self[15], 0))
+
+    @property
+    def temporary_hold_remaining(self):
+        """
+        :return: minutes
+        """
+        return self[16] << 8 | self[17]
+
+    @property
+    def dehumidification_request_demand(self):
+        """
+        :return:
+        """
+        return self[18] * 0.5
+
+    @property
+    def humidification_request_demand(self):
+        """
+        :return:
+        """
+        return self[19] * 0.5
+
+    @property
+    def heat_request_demand(self):
+        """
+        :return:
+        """
+        return self[20] * 0.5
+
+    @property
+    def cool_request_demand(self):
+        """
+        :return:
+        """
+        return self[21] * 0.5
+
+    @property
+    def fan_request_demand(self):
+        """
+        :return:
+        """
+        return self[22] * 0.5
+
+    @property
+    def emergency_heat_request_demand(self):
+        """
+        :return:
+        """
+        return self[23] * 0.5
+
+    @property
+    def aux_heat_request_demand(self):
+        """
+        :return:
+        """
+        return self[24] * 0.5
+
+    @property
+    def relative_humidity(self):
+        """
+        :return:
+        """
+        return self[28]
+
+    @property
+    def away_mode_status(self):
+        """
+        :return: THERMOSTAT_ENABLED or THERMOSTAT_DISABLED
+        """
+        return int(self[29])
+
+    @property
+    def fan_mode_setting(self):
+        """
+        :return: one of THERMOSTAT_FAN_STATUS_* constants
+        """
+        return self[30]
