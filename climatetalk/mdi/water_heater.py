@@ -32,7 +32,6 @@ WH_IGNITER_TYPE_HOT_SURFACE = 0x01
 WH_IGNITER_TYPE_SPARK = 0x02
 WH_IGNITER_TYPE_UNKNOWN = 0xFF
 
-
 WH_LOCKOUT_NOT_ALLOWED = 0x00
 WH_LOCKOUT_INDEFINATE = 0xFF
 
@@ -448,7 +447,9 @@ class WaterHeaterStatus0MDI(bytearray):
 
     @property
     def inlet_gas_pressure(self):
-        return self[41]
+        value = self[41]
+        if value != 0xFF:
+            return value / 10.0
 
     @property
     def gas_manifold_pressure(self):

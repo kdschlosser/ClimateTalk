@@ -8,7 +8,6 @@ from .packet import Packet
 
 logger = logging.getLogger(__name__)
 
-
 INTERPACKET_DELAY_THRESHOLD = 100000
 INTERCHAR_DELAY_THRESHOLD = 3500
 
@@ -20,7 +19,7 @@ CT_ISUM2 = 0x00
 BROADCAST_SUBNET = 0x00
 
 
-class RS485Com(object):
+class RS485(object):
 
     def __init__(self, serial):
         self.serial = serial
@@ -41,7 +40,9 @@ class RS485Com(object):
         packet.calc_checksum()
         with self._send_lock:
             packet_timer = timers.TimerUS()
-            self.serial.write(packet)
+
+            for char in packet:
+                self.serial.write(char)
             while packet_timer.elapsed() < INTERPACKET_DELAY_THRESHOLD:
                 pass
 
