@@ -17,7 +17,7 @@ COOL_PROFILE_CHANGE = 0x04
 SYSTEM_SWITCH_MODIFY = 0x05
 PERMANENT_SET_POINT_TEMP_HOLD_MODIFY = 0x06
 FAN_KEY_SELECTION = 0x07
-HVAC_HOLD_OVERRIDE = 0x08
+HOLD_OVERRIDE = 0x08
 BEEPER_ENABLE = 0x09
 FAHRENHEIT_CELSIUS_DISPLAY = 0x0C
 COMFORT_RECOVERY_MODIFY = 0x0E
@@ -57,7 +57,7 @@ CHANGE_UV_LIGHT_MAINTENANCE_TIMER = 0x5B
 CHANGE_HUMIDIFIER_PAD_MAINT_TIMERALL = 0x5C
 DEHUMIDIFICATION_SET_POINT_MODIFY = 0x5D
 HUMIDIFICATION_SET_POINT_MODIFY = 0x5E
-DAMPER_CLOSURE_POSITION_DEMAND = 0x60
+DAMPER_POSITION_DEMAND = 0x60
 SUBSYSTEM_BUSY_STATUS = 0x61
 DEHUMIDIFICATION_DEMAND = 0x62
 HUMIDIFICATION_DEMAND = 0x63
@@ -323,7 +323,7 @@ class FanKeySelection(CommandPacketBase):
 
     def set_command_data(self, state, demand=None):
         """
-        :param state: one of HVAC_HOLD_OVERRIDE_* constants
+        :param state: one of FAN_KEY_SELECTION_* constants
         :param demand:
         :return:
         """
@@ -341,17 +341,17 @@ class FanKeySelection(CommandPacketBase):
             self._payload_length = 2
 
 
-HVAC_HOLD_OVERRIDE_ENABLE = 0x01
-HVAC_HOLD_OVERRIDE_DISBALE = 0x00
+HOLD_OVERRIDE_ENABLE = 0x01
+HOLD_OVERRIDE_DISBALE = 0x00
 
 
-class HvacHoldOverride(CommandPacketBase):
-    _command_code = HVAC_HOLD_OVERRIDE
+class HoldOverride(CommandPacketBase):
+    _command_code = HOLD_OVERRIDE
     _payload_length = 1
 
     def set_command_data(self, value):
         """
-        :param value: one of HVAC_HOLD_OVERRIDE_* constants
+        :param value: one of HOLD_OVERRIDE_* constants
         :return:
         """
         while len(self) < 14:
@@ -484,19 +484,24 @@ class VacationMode(CommandPacketBase):
     _command_code = VACATION_MODE
     _payload_length = 0
 
-    def set_command_data(self, state, heat_setpoint, cool_setpoint):
+    def set_command_data(self, state, heat_setpoint=None, cool_setpoint=None):
         """
         :param state: one of VACATION_MODE_* constants
         :param heat_setpoint:
         :param cool_setpoint:
         :return:
         """
-        while len(self) < 16:
+        while len(self) < 14:
             self.append(0x00)
 
         self[13] = state
-        self[14] = heat_setpoint
-        self[15] = cool_setpoint
+
+        if None not in (heat_setpoint, cool_setpoint):
+            while len(self) < 16:
+                self.append(0x00)
+
+            self[14] = heat_setpoint
+            self[15] = cool_setpoint
 
 
 class HighAlarmLimitChange(CommandPacketBase):
@@ -965,6 +970,10 @@ class ReversingValveConfig(CommandPacketBase):
     _payload_length = 1
 
     def set_command_data(self, value):
+        """
+        :param value: on of REVERSING_VALVE_CONFIG_* constants
+        :return:
+        """
         while len(self) < 14:
             self.append(0x00)
 
@@ -1050,8 +1059,8 @@ class HumidificationSetPointModify(CommandPacketBase):
     _payload_length = 0
 
 
-class DamperClosurePositionDemand(CommandPacketBase):
-    _command_code = DAMPER_CLOSURE_POSITION_DEMAND
+class DamperPositionDemand(CommandPacketBase):
+    _command_code = DAMPER_POSITION_DEMAND
     _payload_length = 2
 
     def set_command_data(self, refresh_timer, value):

@@ -7,7 +7,7 @@ from ..utils import (
 )
 
 
-class OccupancySensor0MDI(bytearray):
+class OccupancySensorMDI(bytearray):
     id = 0
 
     @property

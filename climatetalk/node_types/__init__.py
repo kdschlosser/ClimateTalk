@@ -103,7 +103,44 @@ import six
     WaterHeaterModify,
 '''
 
+"""
+motor_control commands
 
+
+SetMotorSpeed
+SetMotorTorque
+SetAirflowDemand
+SetControlMode
+SetDemandRampRate
+SetMotorDirection
+SetMotorTorquePercent
+SetMotorPositionDemand
+SetBlowerIdentification0
+SetBlowerIdentification1
+SetBlowerIdentification2
+SetBlowerIdentification3
+SetBlowerIdentification4
+SetBlowerIdentification5
+SetSpeedLimit
+SetTorqueLimit
+SetAirflowLimit
+SetPowerOutputLimit
+SetDeviceTemperatureLimit
+StopMotorbyBraking
+RunStopMotor
+SetDemandRampTime
+SetInducerRampRate
+SetBlowerCoefficient1
+SetBlowerCoefficient2
+SetBlowerCoefficient3
+SetBlowerCoefficient4
+SetBlowerCoefficient5
+SetBlowerCoefficient6
+SetBlowerCoefficient7
+SetBlowerCoefficient8
+SetBlowerCoefficient9
+SetBlowerCoefficient10
+"""
 class NodeType(int):
     def __init__(self, value):
         try:

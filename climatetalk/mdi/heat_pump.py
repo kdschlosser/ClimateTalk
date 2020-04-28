@@ -1,10 +1,30 @@
 # -*- coding: utf-8 -*-
 # Copyright 2020 Kevin Schlosser
 
-
+import datetime
+import threading
 from ..utils import (
     get_bit as _get_bit,
     set_bit as _set_bit
+)
+
+from ..packet import (
+    GetConfigurationRequest,
+    GetStatusRequest
+)
+
+from ..commands import (
+    DefrostDemand,
+    HeatDemand,
+    FanDemand,
+    CoolDemand,
+    DehumidificationDemand,
+    FAN_DEMAND_MANUAL as _FAN_DEMAND_MANUAL,
+    FAN_DEMAND_COOL as _FAN_DEMAND_COOL,
+    FAN_DEMAND_HEAT as _FAN_DEMAND_HEAT,
+    FAN_DEMAND_AUX_HEAT as _FAN_DEMAND_AUX_HEAT,
+    FAN_DEMAND_EMERGENCY_HEAT as _FAN_DEMAND_EMERGENCY_HEAT,
+    FAN_DEMAND_DEFROST as _FAN_DEMAND_DEFROST
 )
 
 HEAT_PUMP_CAPABLE = 0x01
@@ -24,38 +44,125 @@ HEAT_PUMP_FAN_MOTOR_SIZE_ONE_HP = 0x0C  # 1/3 HP
 HEAT_PUMP_FAN_MOTOR_SIZE_TWO_HP = 0x18  # 1/3 HP
 
 
-class HeatPumpConfig0MDI(bytearray):
-    id = 0
+class HeatPumpMDI(object):
+
+    def __init__(self, network, address, subnet, mac_address, session_id):
+        self.network = network
+        self.address = address
+        self.subnet = subnet
+        self.mac_address = mac_address
+        self.session_id = session_id
+
+    def _send(self, packet):
+        """
+        :type packet: .. py:class:: climatetalk.packet.Packet
+        :return:
+        """
+        packet.destination = self.address
+        packet.subnet = self.subnet
+        packet.packet_number = 0x00
+        self.network.send(packet)
+
+    def _get_status_mdi(self, byte_num, num_bytes):
+        num_bytes += 1
+
+        packet = GetStatusRequest()
+        packet.destination = self.address
+        packet.subnet = self.subnet
+        packet.packet_number = 0x00
+
+        event = threading.Event()
+
+        data = bytearray()
+
+        def callback(response):
+            data.extend(
+                response.payload_data[byte_num:byte_num + num_bytes]
+            )
+            GetConfigurationRequest.message_type.disconnect(
+                self.address,
+                self.subnet
+            )
+            event.set()
+
+        GetConfigurationRequest.message_type.connect(
+            self.address,
+            self.subnet,
+            callback
+        )
+
+        self.network.send(packet)
+        event.wait()
+        return data
+
+    def _get_mdi(self, byte_num, num_bytes):
+        num_bytes += 1
+
+        packet = GetConfigurationRequest()
+        packet.destination = self.address
+        packet.subnet = self.subnet
+        packet.packet_number = 0x00
+
+        event = threading.Event()
+
+        data = bytearray()
+
+        def callback(response):
+            data.extend(
+                response.payload_data[byte_num:byte_num + num_bytes]
+            )
+            GetConfigurationRequest.message_type.disconnect(
+                self.address,
+                self.subnet
+            )
+            event.set()
+
+        GetConfigurationRequest.message_type.connect(
+            self.address,
+            self.subnet,
+            callback
+        )
+
+        self.network.send(packet)
+        event.wait()
+        return data
+
+    _get_mdi_1 = _get_mdi
+    _get_mdi_2 = _get_mdi
 
     @property
     def fan_speeds(self):
         """
         :return: 0x0F = variable
         """
-        return self[0] << 4 & 0xF
+        data = self._get_mdi(0, 0)
+        return data[0] << 4 & 0xF
 
     @property
     def heat_stages(self):
         """
         :return: 0x0F = variable
         """
-        return self[1] << 4 & 0xF
+        data = self._get_mdi(1, 0)
+        return data[0] << 4 & 0xF
 
     @property
     def cool_stages(self):
         """
         :return: 0x0F = variable
         """
-        return self[1] & 0xF
+        data = self._get_mdi(1, 0)
+        return data[0] & 0xF
 
     @property
-    def hvac_operation(self):
+    def operation_type(self):
         """
         :return: one of HEAT_PUMP_OPERATION_TYPE_* constants
         """
         res = 0
-        res = _set_bit(res, 1, _get_bit(self[2], 1))
-        res = _set_bit(res, 0, _get_bit(self[2], 0))
+        data = self._get_mdi(2, 0)[0]
+        res = _set_bit(res, 1, _get_bit(data, 1))
+        res = _set_bit(res, 0, _get_bit(data, 0))
         return res
 
     @property
@@ -63,121 +170,201 @@ class HeatPumpConfig0MDI(bytearray):
         """
         :return: HEAT_PUMP_CAPABLE or HEAT_PUMP_NOT_CAPABLE
         """
-        return int(_get_bit(self[3], 0))
+        data = self._get_mdi(3, 0)
+        return int(_get_bit(data[0], 0))
     
     @property
     def tonnage(self):
-        return self[4] * 0.5
-
-
-class HeatPumpConfig1MDI(bytearray):
-    id = 1
+        data = self._get_mdi(4, 0)
+        return data[0] * 0.5
 
     @property
     def cool_speed_trim(self):
-        return self[0]
+        data = self._get_mdi_1(0, 0)
+        return data[0]
 
     @property
     def heat_speed_trim(self):
-        return self[1]
-
-
-class HeatPumpConfig2MDI(bytearray):
-    id = 2
+        data = self._get_mdi_1(1, 0)
+        return data[0]
 
     @property
     def fan_motor_manufacturer_id(self):
         """
         :return: MFG Id
         """
-        return self[0]
+        data = self._get_mdi_2(0, 0)
+        return data[0]
 
     @property
     def fan_motor_size(self):
         """
         :return: one of  HEAT_PUMP_FAN_MOTOR_SIZE_* constants
         """
-        return self[1]
+        data = self._get_mdi_2(1, 0)
+        return data[0]
 
     @property
     def fan_air_flow(self):
         """
         :return: cfm
         """
-        return self[2] << 8 | self[3]
-
-
-class HeatPumpStatus0MDI(bytearray):
-    id = 0
+        data = self._get_mdi_2(2, 1)
+        return data[0] << 8 | data[1]
 
     @property
     def critical_fault(self):
-
-        return self[0]
+        data = self._get_status_mdi(0, 0)
+        return data[0]
 
     @property
     def minor_fault(self):
-        return self[1]
+        data = self._get_status_mdi(1, 0)
+        return data[0]
 
     @property
-    def heat_request_demand(self):
+    def heat_demand(self):
         """
         :return:
         """
-        return self[2] * 0.5
+        data = self._get_status_mdi(2, 0)
+        return data[0] * 0.5
+
+    @heat_demand.setter
+    def heat_demand(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = HeatDemand()
+        packet.set_command_data(timer, value)
+        self._send(packet)
 
     @property
-    def cool_request_demand(self):
+    def cool_demand(self):
         """
         :return:
         """
-        return self[3] * 0.5
+        data = self._get_status_mdi(3, 0)
+        return data[0] * 0.5
+
+    @cool_demand.setter
+    def cool_demand(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = CoolDemand()
+        packet.set_command_data(timer, value)
+        self._send(packet)
 
     @property
-    def dehumidification_request_demand(self):
+    def dehumidification_demand(self):
         """
         :return:
         """
-        return self[4] * 0.5
+        data = self._get_status_mdi(4, 0)
+        return data[0] * 0.5
+
+    @dehumidification_demand.setter
+    def dehumidification_demand(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = DehumidificationDemand()
+        packet.set_command_data(timer, value)
+        self._send(packet)
 
     @property
-    def current_heat_demand(self):
-        return self[5] * 0.5
+    def heat_demand_actual(self):
+        data = self._get_status_mdi(5, 0)
+        return data[0] * 0.5
 
     @property
-    def current_cool_demand(self):
-        return self[6] * 0.5
+    def cool_demand_actual(self):
+        data = self._get_status_mdi(6, 0)
+        return data[0] * 0.5
 
     @property
-    def defrost_request_demand(self):
+    def defrost_demand(self):
         """
         :return:
         """
-        return self[7] * 0.5
+        data = self._get_status_mdi(7, 0)
+        return data[0] * 0.5
+
+    @defrost_demand.setter
+    def defrost_demand(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = DefrostDemand()
+        packet.set_command_data(timer, value)
+        self._send(packet)
 
     @property
-    def fan_request_demand(self):
+    def fan_demand(self):
         """
         :return:
         """
-        return self[8] * 0.5
+        data = self._get_status_mdi(8, 0)
+        return data[0] * 0.5
+
+    def fan_demand_manual(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = FanDemand()
+        packet.set_command_data(timer, _FAN_DEMAND_MANUAL, value)
+        self._send(packet)
+
+    fan_demand_manual = property(fset=fan_demand_manual)
+
+    def fan_demand_cool(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = FanDemand()
+        packet.set_command_data(timer, _FAN_DEMAND_COOL, value)
+        self._send(packet)
+
+    fan_demand_cool = property(fset=fan_demand_cool)
+
+    def fan_demand_heat(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = FanDemand()
+        packet.set_command_data(timer, _FAN_DEMAND_HEAT, value)
+        self._send(packet)
+
+    fan_demand_heat = property(fset=fan_demand_heat)
+
+    def fan_demand_aux_heat(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = FanDemand()
+        packet.set_command_data(timer, _FAN_DEMAND_AUX_HEAT, value)
+        self._send(packet)
+
+    fan_demand_aux_heat = property(fset=fan_demand_aux_heat)
+
+    def fan_demand_emergency_heat(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = FanDemand()
+        packet.set_command_data(timer, _FAN_DEMAND_EMERGENCY_HEAT, value)
+        self._send(packet)
+
+    fan_demand_emergency_heat = property(fset=fan_demand_emergency_heat)
+
+    def fan_demand_defrost(self, value):
+        timer = datetime.time(minute=1, second=0)
+        packet = FanDemand()
+        packet.set_command_data(timer, _FAN_DEMAND_DEFROST, value)
+        self._send(packet)
+
+    fan_demand_defrost = property(fset=fan_demand_defrost)
 
     @property
-    def fan_request_rate(self):
+    def fan_rate(self):
         """
         :return:
         """
-        return self[9]
+        data = self._get_status_mdi(9, 0)
+        return data[0]
 
     @property
-    def fan_request_delay(self):
+    def fan_delay(self):
         """
         :return:
         """
-        return self[10]
+        data = self._get_status_mdi(10, 0)
+        return data[0]
 
     @property
-    def current_dehumidification_demand(self):
-        return self[11] * 0.5
-
-
+    def dehumidification_demand_actual(self):
+        data = self._get_status_mdi(11, 0)
+        return data[0] * 0.5

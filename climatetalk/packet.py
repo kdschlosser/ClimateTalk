@@ -796,14 +796,54 @@ class SetNetworkNodeListResponse(SetNetworkNodeListRequest):
     message_type = SET_NETWORK_NODE_LIST_RESPONSE
 
 
+# byte num
+# Destination Address byte 0
+# Source Address      byte 1
+# Subnet              byte 2
+# Send Method         byte 3
+# Send Parameter 1    byte 4
+# Send Parameter 2    byte 5
+# Source Node Type    byte 6
+# Message Type        byte 7
+# Packet Number       byte 8
+# Packet Length       byte 9
+# Packet Payload      bytes 10-250
+# Message Checksum 1  byte -2
+# Message Checksum 2  byte -1
+
+
+DMA_READ_MDI_TYPE_CONFIGURATION = 0x01
+DMA_READ_MDI_TYPE_STATUS = 0x02
+DMA_READ_MDI_TYPE_SENSOR = 0x03
+DMA_READ_MDI_TYPE_IDENTIFICATION = 0x0E
+
+
 class DirectMemoryAccessReadRequest(Packet):
     """
     MDI values (byte 1 of the payload)
     Configuration: 0x01
     Status: 0x02
     Sensor: 0x07
-    IdentificationL 0x0E
+    Identification 0x0E
 
+    example motor command
+
+    Destination Address             byte 0    [25]
+    Source Address                  byte 1    [3]
+    Subnet                          byte 2    [2]
+    Send Method                     byte 3    [0]
+    Send Parameter 1                byte 4    [0]
+    Send Parameter 2                byte 5    [0]
+    Source Node Type                byte 6    [0x01] thermostat
+    Message Type                    byte 7    [0x1D] DIRECT_MEMORY_ACCESS_READ
+    Packet Number                   byte 8    [0x00]
+    Packet Length                   byte 9    [4]
+    Packet Payload MDI              byte 10   [0x02] Configuration
+    Packet Payload null             byte 11   [0x00] Always 0x00
+    Packet Payload MDI start byte   byte 12   [30]
+    Packet Payload byte count       byte 13   [2]
+    Message Checksum 1              byte 14
+    Message Checksum 2              byte 15
     """
     message_type = DIRECT_MEMORY_ACCESS_READ
     _payload_length = 4
@@ -827,19 +867,19 @@ class DirectMemoryAccessReadRequest(Packet):
         self[11] = value
 
     @property
-    def payload_start_db_id(self):
+    def payload_start_byte(self):
         return self[12]
 
-    @payload_start_db_id.setter
-    def payload_start_db_id(self, value):
+    @payload_start_byte.setter
+    def payload_start_byte(self, value):
         self[12] = value
 
     @property
-    def payload_range(self):
+    def payload_byte_count(self):
         return self[13]
 
-    @payload_range.setter
-    def payload_range(self, value):
+    @payload_byte_count.setter
+    def payload_byte_count(self, value):
         self[13] = value
 
 
@@ -861,6 +901,10 @@ class DirectMemoryAccessReadResponse(Packet):
 
 class DirectMemoryAccessReadResponseMotor(DirectMemoryAccessReadResponse):
     message_type = DIRECT_MEMORY_ACCESS_READ_RESPONSE_MOTOR
+
+    @property
+    def payload_data(self):
+        return self[13:-2]
 
 
 class SetManufacturerGenericDataRequest(Packet):

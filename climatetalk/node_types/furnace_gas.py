@@ -52,9 +52,6 @@ HVAC_TEST_MODE_OFF = 0xFF
 HVAC_ENABLE = 0x01
 HVAC_DISABLE = 0x00
 
-
-
-
 from ..commands import (
     AdvanceRealTimeDayOverride,
     AutoPairingRequest1,
@@ -68,23 +65,19 @@ from ..commands import (
     ClearCompressorRunTime,
     ComfortModeModification,
     ComfortRecoveryModify,
-    CommandPacketBase,
     CommunicationsReceiverOnOff,
     CompressorLockout,
     ContinuousDisplayLight,
-    ControlCommandRefreshTimer,
     CoolDemand,
     CoolProfileChange,
     CoolSetPointTemperatureModify,
     CustomMessageAreaDisplayData,
-    DamperClosurePositionDemand,
+    DamperPositionDemand,
     DefrostDemand,
     DehumidificationDemand,
     DehumidificationSetPointModify,
-    DemandBase,
     FahrenheitCelsiusDisplay,
     FanDemand,
-    FanKeySelection,
     ForcePhoneNumberDisplay,
     HeatDemand,
     HeatProfileChange,
@@ -95,7 +88,7 @@ from ..commands import (
     HumDehumConfig,
     HumidificationDemand,
     HumidificationSetPointModify,
-    HvacHoldOverride,
+    HoldOverride,
     KeypadLockout,
     LimitedHeatAndCoolRange,
     LowAlarmLimitChange,
@@ -148,11 +141,40 @@ from ..commands import (
     StopMotorByBraking,
     SubsystemBusyStatus,
     SubsystemInstallationTest,
-    SystemSwitchModify,
+    ,
     TempDisplayAdjFactorChange,
     TestMode,
     VacationMode,
     WaterHeaterModify,
+)
+
+
+from ..commands import (
+SystemSwitchModify,
+    HeatSetPointTemperatureModify,
+    CoolSetPointTemperatureModify,
+    PermanentSetPointTempHoldModify,
+    HoldOverride,
+    RealTimeDayOverride,
+    HeatProfileChange,
+    CoolProfileChange,
+    FanKeySelection,
+    SubsystemInstallationTest,
+
+
+
+
+    RestoreFactoryDefaults,
+    TestMode,
+    SubsystemBusyStatus,
+    DehumidificationDemand,
+    HumidificationDemand,
+    HeatDemand,
+    CoolDemand,
+    FanDemand,
+    BackUpHeatDemand,
+    DefrostDemand,
+    AuxHeatDemand
 )
 
 
@@ -161,8 +183,7 @@ from ..commands import (
 class FurnaceGas(Node):
     node_type = NODE_TYPE_GAS_FURNACE
 
-    def _send(self, command, data):
-        request = SetControlCommandRequest()
+    def _send(self, packet):
         request.payload_command_code = command
         request.payload_command_data = data
 
@@ -172,7 +193,10 @@ class FurnaceGas(Node):
 
     @heat_setpoint.setter
     def heat_setpoint(self, value):
-        self._send(HVAC_HEAT_SET_POINT_TEMPERATURE_MODIFY, bytearray([value]))
+        packet = HeatSetPointTemperatureModify()
+        packet.set_command_data(value)
+
+        self._send(packet)
 
     @property
     def cool_setpoint(self):
@@ -180,7 +204,10 @@ class FurnaceGas(Node):
 
     @cool_setpoint.setter
     def cool_setpoint(self, value):
-        self._send(HVAC_COOL_SET_POINT_TEMPERATURE_MODIFY, bytearray([value]))
+        packet = CoolSetPointTemperatureModify()
+        packet.set_command_data(value)
+
+        self._send(packet)
 
     @property
     def operating_mode(self):
@@ -195,8 +222,7 @@ class FurnaceGas(Node):
         :param value: one of HVAC_OPERATING_MODE_* constants
         :return:
         """
-
-        self._send(HVAC_SYSTEM_SWITCH_MODIFY, bytearray([value]))
+        SetControlMode
 
     @property
     def hold_temp(self):
@@ -204,10 +230,7 @@ class FurnaceGas(Node):
 
     @hold_temp.setter
     def hold_temp(self, value):
-        packet = HeatSetPointTemperatureModify()
-        packet.set_command_data(value)
-
-        self._send(packet)
+        PermanentSetPointTempHoldModify
 
     @property
     def fan_mode(self):
@@ -224,8 +247,7 @@ class FurnaceGas(Node):
                 value = HVAC_FAN_MODE_HIGH
                 value = bytearray([_FAN_MODE_MANUAL, value])
 
-        self._send(HVAC_FAN_KEY_SELECTION, value)
-
+        FanKeySelection
 
     @property
     def hold_override(self):
@@ -237,7 +259,7 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
-        self._send(HVAC_HOLD_OVERRIDE, bytearray([value]))
+        HoldOverride
 
     @property
     def beep_enable(self):
@@ -249,7 +271,7 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
-        self._send(HVAC_BEEPER_ENABLE, bytearray([value]))
+        BeeperEnable
 
     @property
     def display_scale(self):
@@ -261,7 +283,7 @@ class FurnaceGas(Node):
         :param value:  one of the HVAC_DISPLAY_* constants
         :return:
         """
-        self._send(HVAC_FAHRENHEIT_CELSIUS_DISPLAY, bytearray([value]))
+        FahrenheitCelsiusDisplay
 
     @property
     def comfort_recovery(self):
@@ -273,8 +295,8 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE OR HVAC_DISABLE
         :return:
         """
+        ComfortRecoveryModify
         val = _set_bit(value, 7, True)
-        self._send(HVAC_COMFORT_RECOVERY_MODIFY, bytearray([val]))
 
     @property
     def override_date_time(self):
@@ -286,6 +308,8 @@ class FurnaceGas(Node):
         :param value: datetime.datetime
         :return:
         """
+        RealTimeDayOverride
+
         year = value.year - 2000
         month = value.month - 1
         date = value.day
@@ -308,6 +332,8 @@ class FurnaceGas(Node):
         else:
             value = bytearray([0x01])
 
+        ChangeFilterTimeRemaining
+
         self._send(HVAC_CHANGE_FILTER_TIME_REMAINING, value)
 
     @property
@@ -320,6 +346,8 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
+        VacationMode
+
         self._send(HVAC_VACATION_MODE, bytearray([value]))
 
     @property
@@ -344,6 +372,7 @@ class FurnaceGas(Node):
 
     @high_alarm_temp.setter
     def high_alarm_temp(self, value):
+        HighAlarmLimitChange
         self._send(HVAC_HIGH_ALARM_LIMIT_CHANGE, bytearray([value]))
 
     @property
@@ -352,6 +381,7 @@ class FurnaceGas(Node):
 
     @low_alarm_temp.setter
     def low_alarm_temp(self, value):
+        LowAlarmLimitChange
         self._send(HVAC_LOW_ALARM_LIMIT_CHANGE, bytearray([value]))
 
     @property
@@ -360,6 +390,9 @@ class FurnaceGas(Node):
 
     @high_alarm_outdoor_temp.setter
     def high_alarm_outdoor_temp(self, value):
+        HighOutdoorAlarmLimitChange
+
+
         self._send(HVAC_HIGH_OUTDOOR_ALARM_LIMIT_CHANGE, bytearray([value]))
 
     @property
@@ -368,6 +401,7 @@ class FurnaceGas(Node):
 
     @low_alarm_outdoor_temp.setter
     def low_alarm_outdoor_temp(self, value):
+        LowOutdoorAlarmLimitChange
         self._send(HVAC_LOW_OUTDOOR_ALARM_LIMIT_CHANGE, bytearray([value]))
 
     @property
@@ -376,12 +410,16 @@ class FurnaceGas(Node):
 
     @display_temp_offset.setter
     def display_temp_offset(self, value):
+        TempDisplayAdjFactorChange
         self._send(HVAC_TEMP_DISPLAY_ADJ_FACTOR_CHANGE, bytearray([value]))
 
     def clear_compressor_runtime(self):
+        ClearCompressorRunTime
+
         self._send(HVAC_CLEAR_COMPRESSOR_RUN_TIME, bytearray())
 
     def reset_system(self):
+        ResetMicro
         self._send(HVAC_RESET_MICRO, bytearray())
 
     @property
@@ -394,9 +432,11 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
+        CompressorLockout
         self._send(HVAC_COMPRESSOR_LOCKOUT, bytearray([value]))
 
     def release_hold(self):
+        HoldRelease
         self._send(HVAC_HOLD_RELEASE, bytearray())
 
     @property
@@ -408,6 +448,7 @@ class FurnaceGas(Node):
         """
         :return: one of HAVC_PROGRAM_INTERVAL_TYPE_* constants
         """
+        ProgramIntervalTypeModification
         self._send(HVAC_PROGRAM_INTERVAL_TYPE_MODIFICATION, bytearray([value]))
 
     @property
@@ -420,6 +461,7 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
+        CommunicationsReceiverOnOff
         self._send(HVAC_COMMUNICATIONS_RECEIVER_ON_OFF, bytearray([value]))
 
     @property
@@ -432,9 +474,11 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
+        ForcePhoneNumberDisplay
         self._send(HVAC_FORCE_PHONE_NUMBER_DISPLAY, bytearray([value]))
 
     def restore_factory_daults(self):
+        RestoreFactoryDefaults
         self._send(HVAC_RESTORE_FACTORY_DEFAULTS, bytearray([0x00]))
 
     @property
@@ -447,6 +491,7 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
+        ContinuousDisplayLight
         self._send(HVAC_CONTINUOUS_DISPLAY_LIGHT, bytearray([value]))
 
     def set_date_time(self, dt, gmt_offset, dst=False, lock=False):
@@ -475,7 +520,7 @@ class FurnaceGas(Node):
         ])
 
         payload = bytearray([control, gmt_offset]) + days + seconds
-
+        AdvanceRealTimeDayOverride
         self._send(HVAC_ADVANCE_REAL_TIME_DAY_OVERRIDE, payload)
 
     def lock_keypad(self, state, lock_type, password):
@@ -485,7 +530,7 @@ class FurnaceGas(Node):
         :param password: a password between 0 and 65535, the master pasword is always 00000
         :return:
         """
-
+        KeypadLockout
         payload = bytearray([state, lock_type, password])
         self._send(HVAC_KEYPAD_LOCKOUT, payload)
 
@@ -496,7 +541,7 @@ class FurnaceGas(Node):
         :param test_code: one of HVAC_TEST_MODE_* constants
         :return:
         """
-
+        TestMode
         payload = bytearray([
             mfg_id >> 8 & 0xFF
             mfg_id & 0xFF,
@@ -509,7 +554,7 @@ class FurnaceGas(Node):
         :param state: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
-
+        SubsystemInstallationTest
         self._send(HVAC_SUBSYSTEM_INSTALLATION_TEST, bytearray([state]))
 
     def temp_hold_with_duration(self, temp, minutes):
@@ -518,6 +563,7 @@ class FurnaceGas(Node):
             minutes >> 8 & 0xFF,
             minutes & 0xFF
         ])
+        SetPointTempAndTemporaryHold
         self._send(HVAC_SET_POINT_TEMP_AND_TEMPORARY_HOLD, payload)
 
     @property
@@ -530,7 +576,7 @@ class FurnaceGas(Node):
         :param value: HVAC_ENABLE or HVAC_DISABLE
         :return:
         """
-
+        ComfortModeModification
         self._send(HVAC_COMFORT_MODE_MODIFICATION, bytearray([value]))
 
     @property
@@ -543,7 +589,7 @@ class FurnaceGas(Node):
         :param value: tuple (min temp, max temp)
         :return:
         """
-
+        LimitedHeatAndCoolRange
         min_temp, max_temp = value
         self._send(HVAC_LIMITED_HEAT_AND_COOL_RANGE, bytearray([min_temp, max_temp]))
 
