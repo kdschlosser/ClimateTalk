@@ -146,6 +146,8 @@ class FurnaceMDI(object):
         event.wait()
         return data
 
+    _get_mdi_1 = _get_mdi
+
     @property
     def fan_speeds(self):
         """

@@ -62,7 +62,7 @@ CROSSOVER_FAN_STATUS_ALWAYS_ON = 0x01
 CROSSOVER_FAN_STATUS_OCCUPIED_ON = 0x02
 
 
-class CrossoverConfig0MDI(object):
+class CrossoverMDI(object):
     def __init__(self, network, address, subnet, mac_address, session_id):
         self.network = network
         self.address = address

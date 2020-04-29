@@ -2,14 +2,10 @@
 # Copyright 2020 Kevin Schlosser
 
 import threading
-
-from ..packet import (
-    GetConfigurationRequest,
-    GetStatusRequest
-)
+from ..packet import GetSensorDataRequest, GetSensorDataResponse
 
 
-class ZoneDamperMDI(object):
+class OccupancySensorMDI(object):
 
     def __init__(self, network, address, subnet, mac_address, session_id):
         self.network = network
@@ -18,20 +14,10 @@ class ZoneDamperMDI(object):
         self.mac_address = mac_address
         self.session_id = session_id
 
-    def _send(self, packet):
-        """
-        :type packet: .. py:class:: climatetalk.packet.Packet
-        :return:
-        """
-        packet.destination = self.address
-        packet.subnet = self.subnet
-        packet.packet_number = 0x00
-        self.network.send(packet)
-
     def _get_status_mdi(self, byte_num, num_bytes):
         num_bytes += 1
 
-        packet = GetStatusRequest()
+        packet = GetSensorDataRequest()
         packet.destination = self.address
         packet.subnet = self.subnet
         packet.packet_number = 0x00
@@ -44,13 +30,13 @@ class ZoneDamperMDI(object):
             data.extend(
                 response.payload_data[byte_num:byte_num + num_bytes]
             )
-            GetConfigurationRequest.message_type.disconnect(
+            GetSensorDataResponse.message_type.disconnect(
                 self.address,
                 self.subnet
             )
             event.set()
 
-        GetConfigurationRequest.message_type.connect(
+        GetSensorDataResponse.message_type.connect(
             self.address,
             self.subnet,
             callback
@@ -68,14 +54,10 @@ class ZoneDamperMDI(object):
     @property
     def minor_fault(self):
         data = self._get_status_mdi(1, 0)
+
         return data[0]
 
     @property
-    def position_demand(self):
+    def is_occupied(self):
         data = self._get_status_mdi(2, 0)
-        return data[0] * 0.5
-
-    @property
-    def position_actual(self):
-        data = self._get_status_mdi(3, 0)
-        return data[0] * 0.5
+        return bool(data[0])

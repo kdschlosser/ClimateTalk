@@ -2,6 +2,12 @@
 # Copyright 2020 Kevin Schlosser
 
 import datetime
+import threading
+
+from ..packet import (
+    GetConfigurationRequest,
+    GetStatusRequest
+)
 
 
 WH_TYPE_UNKNOWN = 0x00
@@ -46,216 +52,6 @@ WH_PROGRAM_INTERVAL_TYPE_2_STEP = 0x01
 WH_PROGRAM_INTERVAL_TYPE_4_STEP = 0x02
 WH_PROGRAM_INTERVAL_TYPE_UNAVAILABLE = 0xFF
 
-
-class WaterHeaterConfig0MDI(bytearray):
-    id = 0
-
-    @property
-    def type(self):
-        """returns one of WH_TYPE_* constants"""
-        return self[0]
-
-    @property
-    def application(self):
-        """returns on of WH_APPLICATION_* constants"""
-        return self[1]
-
-    @property
-    def number_of_stages(self):
-        return self[2]
-
-    @property
-    def oem_max_allowed_temperature(self):
-        return self[3]
-
-    @property
-    def user_max_allowed_temperature(self):
-        return self[4]
-
-    @property
-    def oem_max_allowed_differential(self):
-        return self[5]
-
-    @property
-    def user_max_allowed_differential(self):
-        return self[6]
-
-    @property
-    def gallon_capacity(self):
-        return self[7]
-
-    @property
-    def fuel_type(self):
-        """returns one of WH_FUEL_TYPE_* constants"""
-        return self[8]
-
-    @property
-    def has_fvs_sensor(self):
-        return bool(self[9])
-
-    @property
-    def has_flame_sensor(self):
-        return bool(self[10])
-
-    @property
-    def has_pressure_switch(self):
-        return bool(self[11])
-
-    @property
-    def thermistor_count(self):
-        return self[12]
-
-    @property
-    def ignitor_type(self):
-        """returns one of WH_IGNITER_TYPE_* constants"""
-
-        return self[13]
-
-    @property
-    def has_gas_valve(self):
-        return bool(self[14])
-
-    @property
-    def has_limit_switch(self):
-        return bool(self[15])
-
-    @property
-    def has_vent_switch(self):
-        return bool(self[16])
-
-    @property
-    def has_condensate_overflow_switch(self):
-        return bool(self[17])
-
-    @property
-    def has_water_leak_sensor(self):
-        return bool(self[18])
-
-    @property
-    def has_compressor(self):
-        return bool(self[19])
-
-    @property
-    def has_upper_heating_element(self):
-        return bool(self[25])
-
-    @property
-    def has_lower_heating_element(self):
-        return bool(self[26])
-
-    @property
-    def has_collector_pump(self):
-        return bool(self[27])
-
-    @property
-    def max_allowed_lockout_time(self):
-        """returns 1-254 or one of WH_LOCKOUT_* constants"""
-        return self[28]
-
-    @property
-    def has_vacation_mode(self):
-        return bool(self[29])
-
-    @property
-    def has_setback_mode(self):
-        return bool(self[30])
-
-    @property
-    def has_inlet_water_temp_sensor(self):
-        return bool(self[31])
-
-    @property
-    def has_hx_outlet_temp_sensor(self):
-        return bool(self[32])
-
-    @property
-    def has_mixed_water_temp_sensor(self):
-        return bool(self[33])
-
-    @property
-    def has_inlet_water_pressure_sensor(self):
-        return bool(self[34])
-
-    @property
-    def has_outlet_water_pressure_sensor(self):
-        return bool(self[35])
-
-    @property
-    def has_gas_pressure_sensor(self):
-        return bool(self[36])
-
-    @property
-    def has_gas_manifold_pressure_sensor(self):
-        return bool(self[37])
-
-    @property
-    def has_exhaust_temperature_sensor(self):
-        return bool(self[38])
-
-    @property
-    def has_input_line_voltage_sensor(self):
-        return bool(self[39])
-
-    @property
-    def has_collector_inlet_temp_sensor(self):
-        return bool(self[40])
-
-    @property
-    def has_collector_outlet_temp_sensor(self):
-        return bool(self[41])
-
-    @property
-    def has_upper_outlet_temp_sensor(self):
-        return bool(self[42])
-
-    @property
-    def has_lower_inlet_temp_sensor(self):
-        return bool(self[43])
-
-    @property
-    def max_program_hold_time(self):
-
-        return self[49] << 8 | self[50]
-
-    @property
-    def has_keypad_lockout(self):
-        return bool(self[51])
-
-    @property
-    def has_realtime_clock_lockout(self):
-        return bool(self[52])
-
-    @property
-    def has_beeper(self):
-        return bool(self[53])
-
-    @property
-    def communications_fault_timer(self):
-        return self[54] << 8 | self[55]
-
-    @property
-    def program_profile_type(self):
-        """returns one of WH_PROGRAM_PROFILE_TYPE_* constants"""
-        return self[56]
-
-    @property
-    def program_interval_type(self):
-        """returns one of WH_PROGRAM_INTERVAL_TYPE_* constants"""
-        return self[57]
-
-    @property
-    def supports_daylight_savings(self):
-        return bool(self[58])
-
-    @property
-    def gmt_offset(self):
-        return self[59] / 4.0
-
-    @property
-    def display_contrast(self):
-        return self[60]
-
-
 WH_CONTROL_STATE_IDLE = 0x00
 WH_CONTROL_STATE_PRE_PURGE = 0x01
 WH_CONTROL_STATE_IGNITER_WARMUP = 0x02
@@ -283,51 +79,361 @@ WH_LINE_VOLTAGE_STATUS_NORMAL = 0x02
 WH_LINE_VOLTAGE_STATUS_OVER = 0x03
 
 
-class WaterHeaterStatus0MDI(bytearray):
+class WaterHeaterMDI(object):
 
-    id = 0
+    def __init__(self, network, address, subnet, mac_address, session_id):
+        self.network = network
+        self.address = address
+        self.subnet = subnet
+        self.mac_address = mac_address
+        self.session_id = session_id
+
+    def _send(self, packet):
+        """
+        :type packet: .. py:class:: climatetalk.packet.Packet
+        :return:
+        """
+        packet.destination = self.address
+        packet.subnet = self.subnet
+        packet.packet_number = 0x00
+        self.network.send(packet)
+
+    def _get_status_mdi(self, byte_num, num_bytes):
+        num_bytes += 1
+
+        packet = GetStatusRequest()
+        packet.destination = self.address
+        packet.subnet = self.subnet
+        packet.packet_number = 0x00
+
+        event = threading.Event()
+
+        data = bytearray()
+
+        def callback(response):
+            data.extend(
+                response.payload_data[byte_num:byte_num + num_bytes]
+            )
+            GetConfigurationRequest.message_type.disconnect(
+                self.address,
+                self.subnet
+            )
+            event.set()
+
+        GetConfigurationRequest.message_type.connect(
+            self.address,
+            self.subnet,
+            callback
+        )
+
+        self.network.send(packet)
+        event.wait()
+        return data
+
+    def _get_mdi(self, byte_num, num_bytes):
+        num_bytes += 1
+
+        packet = GetConfigurationRequest()
+        packet.destination = self.address
+        packet.subnet = self.subnet
+        packet.packet_number = 0x00
+
+        event = threading.Event()
+
+        data = bytearray()
+
+        def callback(response):
+            data.extend(
+                response.payload_data[byte_num:byte_num + num_bytes]
+            )
+            GetConfigurationRequest.message_type.disconnect(
+                self.address,
+                self.subnet
+            )
+            event.set()
+
+        GetConfigurationRequest.message_type.connect(
+            self.address,
+            self.subnet,
+            callback
+        )
+
+        self.network.send(packet)
+        event.wait()
+        return data
+
+    def _has(self, byte_num):
+        return bool(self._get_mdi(byte_num, 0)[0])
+
+    @property
+    def type(self):
+        """returns one of WH_TYPE_* constants"""
+        data = self._get_mdi(0, 0)
+        return data[0]
+
+    @property
+    def application(self):
+        """returns on of WH_APPLICATION_* constants"""
+        data = self._get_mdi(1, 0)
+        return data[0]
+
+    @property
+    def number_of_stages(self):
+        data = self._get_mdi(5, 0)
+        return data[0]
+
+    @property
+    def oem_max_allowed_temperature(self):
+        data = self._get_mdi(3, 0)
+        return data[0]
+
+    @property
+    def user_max_allowed_temperature(self):
+        data = self._get_mdi(4, 0)
+        return data[0]
+
+    @property
+    def oem_max_allowed_differential(self):
+        data = self._get_mdi(5, 0)
+        return data[0]
+
+    @property
+    def user_max_allowed_differential(self):
+        data = self._get_mdi(6, 0)
+        return data[0]
+
+    @property
+    def gallon_capacity(self):
+        data = self._get_mdi(7, 0)
+        return data[0]
+
+    @property
+    def fuel_type(self):
+        """returns one of WH_FUEL_TYPE_* constants"""
+        data = self._get_mdi(8, 0)
+        return data[0]
+
+    @property
+    def has_fvs_sensor(self):
+        return self._has(9)
+
+    @property
+    def has_flame_sensor(self):
+        return self._has(10)
+
+    @property
+    def has_pressure_switch(self):
+        return self._has(11)
+
+    @property
+    def thermistor_count(self):
+        data = self._get_mdi(13, 0)
+        return data[0]
+
+    @property
+    def ignitor_type(self):
+        """returns one of WH_IGNITER_TYPE_* constants"""
+        data = self._get_mdi(13, 0)
+        return data[0]
+
+    @property
+    def has_gas_valve(self):
+        return self._has(14)
+
+    @property
+    def has_limit_switch(self):
+        return self._has(15)
+
+    @property
+    def has_vent_switch(self):
+        return self._has(16)
+
+    @property
+    def has_condensate_overflow_switch(self):
+        return self._has(17)
+
+    @property
+    def has_water_leak_sensor(self):
+        return self._has(18)
+
+    @property
+    def has_compressor(self):
+        return self._has(19)
+
+    @property
+    def has_upper_heating_element(self):
+        return self._has(25)
+
+    @property
+    def has_lower_heating_element(self):
+        return self._has(26)
+
+    @property
+    def has_collector_pump(self):
+        return self._has(27)
+
+    @property
+    def max_allowed_lockout_time(self):
+        """returns 1-254 or one of WH_LOCKOUT_* constants"""
+        data = self._get_mdi(28, 0)
+        return data[0]
+
+    @property
+    def has_vacation_mode(self):
+        return self._has(29)
+
+    @property
+    def has_setback_mode(self):
+        return self._has(30)
+
+    @property
+    def has_inlet_water_temp_sensor(self):
+        return self._has(31)
+
+    @property
+    def has_hx_outlet_temp_sensor(self):
+        return self._has(32)
+
+    @property
+    def has_mixed_water_temp_sensor(self):
+        return self._has(33)
+
+    @property
+    def has_inlet_water_pressure_sensor(self):
+        return self._has(34)
+
+    @property
+    def has_outlet_water_pressure_sensor(self):
+        return self._has(35)
+
+    @property
+    def has_gas_pressure_sensor(self):
+        return self._has(36)
+
+    @property
+    def has_gas_manifold_pressure_sensor(self):
+        return self._has(37)
+
+    @property
+    def has_exhaust_temperature_sensor(self):
+        return self._has(38)
+
+    @property
+    def has_input_line_voltage_sensor(self):
+        return self._has(39)
+
+    @property
+    def has_collector_inlet_temp_sensor(self):
+        return self._has(40)
+
+    @property
+    def has_collector_outlet_temp_sensor(self):
+        return self._has(41)
+
+    @property
+    def has_upper_outlet_temp_sensor(self):
+        return self._has(42)
+
+    @property
+    def has_lower_inlet_temp_sensor(self):
+        return self._has(43)
+
+    @property
+    def max_program_hold_time(self):
+        data = self._get_mdi(49, 1)
+        return data[0] << 8 | data[1]
+
+    @property
+    def has_keypad_lockout(self):
+        return self._has(51)
+
+    @property
+    def has_realtime_clock_lockout(self):
+        return self._has(52)
+
+    @property
+    def has_beeper(self):
+        return self._has(53)
+
+    @property
+    def communications_fault_timer(self):
+        data = self._get_mdi(54, 1)
+        return data[0] << 8 | data[1]
+
+    @property
+    def program_profile_type(self):
+        """returns one of WH_PROGRAM_PROFILE_TYPE_* constants"""
+        data = self._get_mdi(56, 0)
+        return data[0]
+
+    @property
+    def program_interval_type(self):
+        """returns one of WH_PROGRAM_INTERVAL_TYPE_* constants"""
+        data = self._get_mdi(57, 0)
+        return data[0]
+
+    @property
+    def supports_daylight_savings(self):
+        return self._has(58)
+
+    @property
+    def gmt_offset(self):
+        data = self._get_mdi(59, 0)
+        return data[0] / 4.0
+
+    @property
+    def display_contrast(self):
+        data = self._get_mdi(60, 0)
+        return data[0]
 
     def _is_on(self, byte_num):
-        value = self[byte_num]
-        if value != 0xFF:
-            return bool(value)
+        data = self._get_status_mdi(byte_num, 0)[0]
+        if data != 0xFF:
+            return bool(data)
 
     @property
     def critical_fault(self):
-        return self[1]
+        data = self._get_status_mdi(1, 0)
+        return data[0]
 
     @property
     def minor_fault(self):
-        return self[2]
+        data = self._get_status_mdi(2, 0)
+        return data[0]
 
     @property
     def tank_temp(self):
         """
         :return: 0x00 = unknown 0xFF = probe failure
         """
-        return self[3]
+        data = self._get_status_mdi(3, 0)
+        return data[0]
 
     @property
     def setpoint(self):
-        return self[4]
+        data = self._get_status_mdi(4, 0)
+        return data[0]
 
     @property
     def max_setpoint(self):
-        return self[5]
+        data = self._get_status_mdi(5, 0)
+        return data[0]
 
     @property
     def state(self):
         """
         :return: one of WH_CONTROL_STATE_* constants
         """
-        return self[6]
+        data = self._get_status_mdi(6, 0)
+        return data[0]
 
     @property
     def fvs_sensor_status(self):
         """
         :return: one of WH_SENSOR_STATE_* constants
         """
-        return self[7]
+        data = self._get_status_mdi(7, 0)
+        return data[0]
 
     @property
     def has_flame(self):
@@ -335,7 +441,7 @@ class WaterHeaterStatus0MDI(bytearray):
 
     @property
     def pws_open(self):
-        value = self[9]
+        value = self._get_status_mdi(9, 0)[0]
         if value != 0xFF:
             return not value
 
@@ -344,7 +450,8 @@ class WaterHeaterStatus0MDI(bytearray):
         """
         :return: one of WH_SENSOR_STATE_* constants
         """
-        return self[10]
+        data = self._get_status_mdi(10, 0)
+        return data[0]
 
     @property
     def is_igniter_on(self):
@@ -364,13 +471,13 @@ class WaterHeaterStatus0MDI(bytearray):
 
     @property
     def is_limit_switch_open(self):
-        value = self[17]
+        value = self._get_status_mdi(17, 0)[0]
         if value != 0xFF:
             return not value
 
     @property
     def is_vent_switch_open(self):
-        value = self[18]
+        value = self._get_status_mdi(18, 0)[0]
         if value != 0xFF:
             return not value
 
@@ -403,11 +510,13 @@ class WaterHeaterStatus0MDI(bytearray):
         """
         :return: one of WH_LOCKOUT_TYPE_* constants
         """
-        return self[30]
+        data = self._get_status_mdi(30, 0)
+        return data[0]
 
     @property
     def lockout_time_remaining(self):
-        return self[31]
+        data = self._get_status_mdi(31, 0)
+        return data[0]
 
     @property
     def retry_in_progress(self):
@@ -427,149 +536,176 @@ class WaterHeaterStatus0MDI(bytearray):
 
     @property
     def inlet_water_temp(self):
-        return self[36]
+        data = self._get_status_mdi(36, 0)
+        return data[0]
 
     @property
     def hx_outet_temp(self):
-        return self[37]
+        data = self._get_status_mdi(37, 0)
+        return data[0]
 
     @property
     def mixed_water_temp(self):
-        return self[38]
+        data = self._get_status_mdi(38, 0)
+        return data[0]
 
     @property
     def inlet_water_pressure(self):
-        return self[39]
+        data = self._get_status_mdi(39, 0)
+        return data[0]
 
     @property
     def outlet_water_pressure(self):
-        return self[40]
+        data = self._get_status_mdi(40, 0)
+        return data[0]
 
     @property
     def inlet_gas_pressure(self):
-        value = self[41]
+        value = self._get_status_mdi(41, 0)[0]
         if value != 0xFF:
             return value / 10.0
 
     @property
     def gas_manifold_pressure(self):
-        value = self[42]
+        value = self._get_status_mdi(42, 0)[0]
         if value != 0xFF:
             return value / 10.0
 
     @property
     def exhaust_temperature(self):
-        value = self[43]
+        value = self._get_status_mdi(43, 0)[0]
         if value != 0xFF:
             return value * 10
 
     @property
     def draft_inducer_speed(self):
-        return self[44] << 8 | self[45]
+        data = self._get_status_mdi(44, 1)
+        return data[0] << 8 | data[1]
 
     @property
     def gas_demand(self):
-        return self[46]
+        data = self._get_status_mdi(46, 0)
+        return data[0]
 
     @property
     def water_flow_demand(self):
-        return self[47]
+        data = self._get_status_mdi(47, 0)
+        return data[0]
 
     @property
     def line_voltage(self):
-        return self[48] << 8 | self[49]
+        data = self._get_status_mdi(48, 1)
+        return data[0] << 8 | data[1]
 
     @property
     def line_voltage_status(self):
         """
         :return: one of WH_LINE_VOLTAGE_STATUS_* constants
         """
-        return self[50]
+        data = self._get_status_mdi(50, 0)
+        return data[0]
 
     @property
     def collector_inlet_temp(self):
-        return self[51]
+        data = self._get_status_mdi(51, 0)
+        return data[0]
 
     @property
     def collector_outlet_temp(self):
-        return self[52]
+        data = self._get_status_mdi(52, 0)
+        return data[0]
 
     @property
     def collector_pump_speed(self):
-        return self[53] << 8 | self[54]
+        data = self._get_status_mdi(53, 1)
+        return data[0] << 8 | data[1]
 
     @property
     def collector_pump_flow_rate(self):
-        return self[55] << 8 | self[56]
+        data = self._get_status_mdi(55, 1)
+        return data[0] << 8 | data[1]
 
     @property
     def setback_temp(self):
-        return self[57]
+        data = self._get_status_mdi(57, 0)
+        return data[0]
 
     @property
     def vacation_temp(self):
-        return self[58]
+        data = self._get_status_mdi(58, 0)
+        return data[0]
 
     @property
     def cycle_count(self):
-        return self[59] << 8 | self[60]
+        data = self._get_status_mdi(59, 1)
+        return data[0] << 8 | data[1]
 
     @property
     def total_time(self):
+        data = self._get_status_mdi(62, 4)
         value = (
-            self[62] << 24 |
-            self[63] << 16 |
-            self[64] << 8 |
-            self[65]
+            data[0] << 24 |
+            data[1] << 16 |
+            data[2] << 8 |
+            data[3]
         )
 
         return datetime.timedelta(minutes=value)
 
     @property
     def running_time(self):
+        data = self._get_status_mdi(66, 4)
         value = (
-                self[66] << 24 |
-                self[67] << 16 |
-                self[68] << 8 |
-                self[69]
+                data[0] << 24 |
+                data[1] << 16 |
+                data[2] << 8 |
+                data[3]
         )
 
         return datetime.timedelta(minutes=value)
 
     @property
     def upper_outlet_temp(self):
-        return self[70]
+        data = self._get_status_mdi(70, 0)
+        return data[0]
 
     @property
     def aux_1_temp(self):
-        return self[71]
+        data = self._get_status_mdi(71, 0)
+        return data[0]
 
     @property
     def aux_2_temp(self):
-        return self[72]
+        data = self._get_status_mdi(72, 0)
+        return data[0]
 
     @property
     def lower_inlet_temp(self):
-        return self[73]
+        data = self._get_status_mdi(73, 0)
+        return data[0]
 
     @property
     def number_stages_on(self):
-        return self[74]
+        data = self._get_status_mdi(74, 0)
+        return data[0]
 
     @property
     def modulation_percent(self):
-        return self[75]
+        data = self._get_status_mdi(75, 0)
+        return data[0]
 
     @property
     def number_elements_on(self):
-        return self[76]
+        data = self._get_status_mdi(76, 0)
+        return data[0]
 
     @property
     def total_energy_consumption(self):
+        data = self._get_status_mdi(66, 4)
         value = (
-            self[66] << 24 |
-            self[67] << 16 |
-            self[68] << 8 |
-            self[69]
+                data[0] << 24 |
+                data[1] << 16 |
+                data[2] << 8 |
+                data[3]
         )
         return value

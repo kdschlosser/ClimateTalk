@@ -124,7 +124,7 @@ MOTOR_DIRECTION_CLOCKWISE = 0x01
 MOTOR_DIRECTION_COUNTER_CLOCKWISE = 0x00
 
 
-class MotorConfig0MDI(object):
+class MotorMDI(object):
 
     def __init__(self, network, address, subnet, mac_address, session_id):
         self.network = network
@@ -244,7 +244,6 @@ class MotorConfig0MDI(object):
         packet.set_command_data(value)
         self._send(packet)
 
-
     @property
     def demand_ramp_rate(self):
         """
@@ -259,13 +258,13 @@ class MotorConfig0MDI(object):
         packet.set_command_data(value)
         self._send(packet)
 
-
-    SetDemandRampTime,
-    SetMotorPositionDemand,
+    # SetDemandRampTime,
+    # SetMotorPositionDemand,
 
     def stop_motor(self, braking):
-        RunStopMotor
-        StopMotorByBraking
+        # RunStopMotor
+        # StopMotorByBraking
+        pass
 
     def run_motor(self, ramp_time, demand):
         mode = self.control_mode
@@ -292,10 +291,9 @@ class MotorConfig0MDI(object):
         packet.set_command_data(0x01)
         self._send(packet)
 
-
     @property
     def inducer_ramp_rate(self):
-        pass
+        return None
 
     @inducer_ramp_rate.setter
     def inducer_ramp_rate(self, value):
@@ -486,6 +484,7 @@ class MotorConfig0MDI(object):
         packet = SetBlowerCoefficient2()
         packet.set_command_data(value)
         self._send(packet)
+
     @property
     def blower_coefficient3(self):
         data = self._get_ident_mdi(22, 1)
@@ -639,10 +638,3 @@ class MotorConfig0MDI(object):
         packet = SetBlowerIdentification5()
         packet.set_command_data(value)
         self._send(packet)
-
-
-
-
-
-
-

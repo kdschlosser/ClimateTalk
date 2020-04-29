@@ -37,7 +37,7 @@ AC_FAN_MOTOR_SIZE_ONE_HP = 0x0C  # 1/3 HP
 AC_FAN_MOTOR_SIZE_TWO_HP = 0x18  # 1/3 HP
 
 
-class AirConditionerConfig0MDI(object):
+class AirConditionerMDI(object):
 
     def __init__(self, network, address, subnet, mac_address, session_id):
         self.network = network

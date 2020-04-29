@@ -503,6 +503,21 @@ class GetSensorDataRequest(Packet):
 class GetSensorDataResponse(Packet):
     message_type = GET_SENSOR_DATA_RESPONSE
 
+    class SensorData(object):
+
+        def __init__(self, id, data):
+            self.id = id
+            self.data = data
+
+    def __iter__(self):
+        data = self.payload_data
+        while data:
+            db_id = data[0]
+            db_len = data[1]
+            db_data = data[2:db_len]
+            data = data[:db_len + 2]
+            yield self.SensorData(db_id, db_data)
+
     @property
     def payload_data(self):
         return self[11:-2]

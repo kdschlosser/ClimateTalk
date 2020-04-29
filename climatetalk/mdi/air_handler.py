@@ -464,4 +464,3 @@ class AirHandlerConfig1MDI(bytearray):
             return self[5] - 100
 
         return 0
-

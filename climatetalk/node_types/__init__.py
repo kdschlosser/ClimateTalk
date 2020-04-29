@@ -141,6 +141,7 @@ SetBlowerCoefficient8
 SetBlowerCoefficient9
 SetBlowerCoefficient10
 """
+
 class NodeType(int):
     def __init__(self, value):
         try:
